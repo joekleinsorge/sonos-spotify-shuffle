@@ -22,10 +22,11 @@ var (
 )
 
 func main() {
+	// TODO: Check if user is already authenticated and skip if so
 	// Authenticate with Spotify User
 	ctx := context.Background()
 
-	// TODO: Check if user is already authenticated and skip if so
+
 	
 	// first start an HTTP server
 	http.HandleFunc("/callback", completeAuth)
