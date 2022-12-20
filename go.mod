@@ -1,4 +1,4 @@
-module shuffle-spotify
+module sonos-spotify-shuffle
 
 go 1.19
 
