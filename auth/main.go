@@ -14,6 +14,7 @@ import (
 	"net/http"
 
 	"github.com/zmb3/spotify/v2"
+	spotifyauth "github.com/zmb3/spotify/v2/auth"
 )
 
 // redirectURI is the OAuth redirect URI for the application.
