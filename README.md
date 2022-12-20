@@ -1,5 +1,7 @@
 # Sonos Spotify Shuffle
 
+[![Go Report Card](https://goreportcard.com/badge/joekleinsorge/sonos-spotify-shuffle)](https://goreportcard.com/report/joekleinsorge/sonos-spotify-shuffle)
+
 A simple script to force shuffle Spotify playlists because Google Assistant on Sonos can't do it.
 
 ## How to use
