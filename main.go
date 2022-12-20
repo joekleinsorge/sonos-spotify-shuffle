@@ -7,6 +7,7 @@ import (
 	"math/rand"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/zmb3/spotify/v2"
 	spotifyauth "github.com/zmb3/spotify/v2/auth"
@@ -15,13 +16,14 @@ import (
 const redirectURI = "http://localhost:8080/callback"
 
 var (
-	auth  = spotifyauth.New(spotifyauth.WithRedirectURL(redirectURI), spotifyauth.WithScopes(spotifyauth.ScopeUserReadPrivate))
+	auth  = spotifyauth.New(spotifyauth.WithRedirectURL(redirectURI), spotifyauth.WithScopes(spotifyauth.ScopePlaylistModifyPublic))
 	ch    = make(chan *spotify.Client)
 	state = "abc123"
 )
 
 func main() {
-	// Get user authorization
+	// Authenticate with Spotify User
+	ctx := context.Background()
 
 	// first start an HTTP server
 	http.HandleFunc("/callback", completeAuth)
@@ -48,46 +50,68 @@ func main() {
 	}
 	fmt.Println("You are logged in as:", user.ID)
 
-	playlistID := os.Getenv("SPOTIFY_PLAYLIST_ID")
+	//  Get list of playlists to shuffle from environment variable
+	playlistsToShuffle := strings.Split(os.Getenv("SPOTIFY_PLAYLISTS"), ",")
 
-	
-	// Get the first 100 tracks in the playlist
-	tracks, err := client.GetPlaylistTracks(playlistID)
+	// Get the users playlists
+	playlists, err := client.GetPlaylistsForUser(ctx, user.ID)
 	if err != nil {
-		log.Fatalf("error retrieve playlist tracks: %v", err)
+		log.Fatalf("error retrieve user playlists: %v", err)
 	}
 
-	// Print the tracks in current order
-	fmt.Println("Original tracks:")
-	for _, track := range tracks.Tracks {
-		fmt.Println( "- ", track.Track.ID)
-	}
-
-	// Create a new slice of tracks ID to reorder
-	var newTracks []spotify.ID
-	for _, track := range tracks.Tracks {
-		newTracks = append(newTracks, track.Track.ID)
-	}
-
-	// Shuffle the tracks
-	for i := range newTracks {
-		j := rand.Intn(i + 1)
-		newTracks[i], newTracks[j] = newTracks[j], newTracks[i]
-	}
-
-	// Print the new track IDs
-	fmt.Println("New track IDs:")
-	for _, trackID := range newTracks {
-		fmt.Println( "- ", trackID)
-	}
-
-	// Replace the tracks in the playlist with the new order
-	err = client.ReplacePlaylistTracks(playlistID, newTracks...)
-	if err != nil {
-		log.Fatalf("error replace playlist tracks: %v", err)
+	// Get the IDs of the playlists to shuffle
+	var playlistIDs []spotify.ID
+	for _, playlist := range playlists.Playlists {
+		for _, playlistToShuffle := range playlistsToShuffle {
+			if playlist.Name == playlistToShuffle {
+				playlistIDs = append(playlistIDs, playlist.ID)
+			}
+		}
 	}
 	
-	fmt.Println("Playlist shuffled!")
+	// Shuffle the playlists
+	for _, playlistID := range playlistIDs {
+		
+		// Get the first 100 tracks in the playlist
+		tracks, err := client.GetPlaylistTracks(ctx, playlistID)
+		if err != nil {
+			log.Fatalf("error retrieve playlist tracks: %v", err)
+		}
+
+		// // Print the tracks in current order
+		// fmt.Println("Original tracks:")
+		// for _, track := range tracks.Tracks {
+		// 	fmt.Println( "- ", track.Track.ID)
+		// }
+
+		// Create a new slice of tracks ID to reorder
+		var newTracks []spotify.ID
+		for _, track := range tracks.Tracks {
+			newTracks = append(newTracks, track.Track.ID)
+		}
+
+		// Shuffle the tracks
+		for i := range newTracks {
+			j := rand.Intn(i + 1)
+			newTracks[i], newTracks[j] = newTracks[j], newTracks[i]
+		}
+
+		// // Print the new track IDs
+		// fmt.Println("New track IDs:")
+		// for _, trackID := range newTracks {
+		// 	fmt.Println( "- ", trackID)
+		// }
+
+		// Replace the tracks in the playlist with the new order
+		err = client.ReplacePlaylistTracks(ctx, playlistID, newTracks...)
+		if err != nil {
+			log.Fatalf("error replace playlist tracks: %v", err)
+		}
+		
+		fmt.Println("Playlist shuffled!")
+	}
+
+	fmt.Println("Done!")
 }
 
 func completeAuth(w http.ResponseWriter, r *http.Request) {

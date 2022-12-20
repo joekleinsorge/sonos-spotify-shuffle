@@ -1,0 +1,35 @@
+on:
+  workflow_dispatch:
+  push:
+    branches-ignore:
+      - main
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+
+    - uses: actions/setup-go@v3
+      with:
+        go-version: 1.17
+
+    - name: Unit Tests
+      run: go test -v ./...
+
+    - name: Generate Coverage Report
+      run: |
+        go test -json -coverprofile=cover.out ./... > result.json
+        go tool cover -func cover.out
+    - name: Minimum Coverage Percent
+      env:
+          MIN: 30
+      run: |
+            pct=`go tool cover -func=cover.out | grep total | grep -Eo '[0-9]+\.[0-9]+'`
+            echo "Current test coverage : $pct %"
+            if (( $(echo "$pct $MIN" | awk '{print ($1 > $2)}') )); then
+                echo "OK"
+            else
+                echo "Current test coverage is below threshold of $MIN percent"
+                exit 1
+            fi
