@@ -6,7 +6,7 @@ A simple script to force shuffle Spotify playlists because Google Assistant on S
 
 1. Have a Spotify Premium account
 2. Have `Go` installed
-3. [Create a Spotify app](https://developer.spotify.com/my-applications/) and get the ID and Secret
+3. [Create a Spotify app](https://developer.spotify.com/my-applications/) and get the `ID` and `Secret`
    1. Set the redirect URI to `http://localhost:8080/callback`
 4. Clone this repo `gh repo clone joekleinsorge/sonos-spotify-shuffle`
 5. Create the following environment variables:
