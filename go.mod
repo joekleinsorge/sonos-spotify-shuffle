@@ -1,4 +1,4 @@
-module sonos-spotify-shuffle
+module github.com/joekleinsorge/sonos-spotify-shuffle
 
 go 1.19
 
