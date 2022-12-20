@@ -25,6 +25,8 @@ func main() {
 	// Authenticate with Spotify User
 	ctx := context.Background()
 
+	// TODO: Check if user is already authenticated and skip if so
+	
 	// first start an HTTP server
 	http.HandleFunc("/callback", completeAuth)
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
@@ -69,9 +71,9 @@ func main() {
 		}
 	}
 	
+	// TODO: Break out into a function
 	// Shuffle the playlists
 	for _, playlistID := range playlistIDs {
-		
 		// Get the first 100 tracks in the playlist
 		tracks, err := client.GetPlaylistTracks(ctx, playlistID)
 		if err != nil {
