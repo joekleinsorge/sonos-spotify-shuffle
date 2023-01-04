@@ -55,14 +55,25 @@ func main() {
 	playlistsToShuffle := strings.Split(os.Getenv("SPOTIFY_PLAYLISTS"), ",")
 	fmt.Println("Playlists to shuffle: ", playlistsToShuffle)
 
-	// Get the users playlists
+	// Get the playlist IDs
+	playlistIDs := getPlaylistIDs(ctx, client, user, playlistsToShuffle)
+
+	// Shuffle the playlists
+	for _, playlistID := range playlistIDs {
+		shufflePlaylist(client, playlistID)
+	}
+
+	fmt.Println("Done!")
+}
+
+func getPlaylistIDs(ctx context.Context, client *spotify.Client, user *spotify.PrivateUser,playlistsToShuffle []string) (playlistIDs []spotify.ID){
+
 	playlists, err := client.GetPlaylistsForUser(ctx, user.ID)
 	if err != nil {
 		log.Fatalf("error retrieve user playlists: %v", err)
 	}
 
 	// Get the IDs of the playlists to shuffle
-	var playlistIDs []spotify.ID
 	for _, playlist := range playlists.Playlists {
 		for _, playlistToShuffle := range playlistsToShuffle {
 			if playlist.Name == playlistToShuffle {
@@ -71,13 +82,7 @@ func main() {
 			}
 		}
 	}
-	
-	// Shuffle the playlists
-	for _, playlistID := range playlistIDs {
-		shufflePlaylist(client, playlistID)
-	}
-
-	fmt.Println("Done!")
+ return playlistIDs
 }
 
 func shufflePlaylist(client *spotify.Client, playlistID spotify.ID) {
