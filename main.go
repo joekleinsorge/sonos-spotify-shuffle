@@ -76,7 +76,7 @@ func getPlaylistIDs(ctx context.Context, client *spotify.Client, user *spotify.P
 	// Get the IDs of the playlists to shuffle
 	for _, playlist := range playlists.Playlists {
 		for _, playlistToShuffle := range playlistsToShuffle {
-			if playlist.Name == playlistToShuffle {
+			if strings.ToLower(playlist.Name) == strings.ToLower(playlistToShuffle) {
 				fmt.Println("Found:", playlist.Name, "-", playlist.ID)
 				playlistIDs = append(playlistIDs, playlist.ID)
 			}
