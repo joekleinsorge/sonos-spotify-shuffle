@@ -2,7 +2,19 @@
 
 [![Go Report Card](https://goreportcard.com/badge/joekleinsorge/sonos-spotify-shuffle)](https://goreportcard.com/report/joekleinsorge/sonos-spotify-shuffle)
 
-A simple script to force shuffle Spotify playlists because Google Assistant on Sonos can't do it.
+A simple script to force shuffle Spotify playlists because Google Assistant running through Sonos can't do it.
+
+## Why this exists
+
+I have a few Sonos speakers and use Google Assistant to control my smart home. I also have a few themed Spotify playlists that we like to listen to during dinner. However, it dinner only lasts so long and we end up listening to the same few song again and again.
+
+Now the easy solution would be to open either the Spotify or Sonos apps and just click the shuffle button. However, I don't want to have my phone out during dinner.
+
+My preferred solution would be to just ask Google Assistant to shuffle my playlists. Unfortunately, this is currently not possible. I can ask it to play a playlist, but it will always play the playlist in order. So I decided to write this script to permanently shuffle the playlists every time we get bored.
+
+## What this does
+
+This script will authenticate with Spotify and then it will find the `ID`s of the playlists you added to `SPOTIFY_PLAYLIST`. It will then randomly shuffle the songs in each playlist and replace the existing playlist with the shuffled version.
 
 ## How to use
 
