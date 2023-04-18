@@ -3,6 +3,9 @@ name: Shuffle Spotify Playlists
 on:
   workflow_dispatch:
 
+env:
+  SPOTIFY_PLAYLISTS: "[kleinsorge beach, kleinsorge italian, kleinsorge mexican, kleinsorge french]"
+
 jobs:
   shuffle_playlists:
     runs-on: ubuntu-latest
@@ -20,4 +23,4 @@ jobs:
         SPOTIFY_CLIENT_ID: ${{ secrets.SPOTIFY_CLIENT_ID }}
         SPOTIFY_CLIENT_SECRET: ${{ secrets.SPOTIFY_CLIENT_SECRET }}
         SPOTIFY_USER_ID: ${{ secrets.SPOTIFY_USER_ID }}
-        SPOTIFY_PLAYLISTS: ${{ var.SPOTIFY_PLAYLISTS}}
+        SPOTIFY_PLAYLISTS: ${{ env.SPOTIFY_PLAYLISTS }}
