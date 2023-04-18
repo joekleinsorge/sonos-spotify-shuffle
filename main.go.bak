@@ -1,0 +1,152 @@
+package main
+
+import (
+	"context"
+	"fmt"
+	"log"
+	"math/rand"
+	"net/http"
+	"os"
+	"strings"
+
+	"github.com/zmb3/spotify/v2"
+)
+
+const (
+	redirectURI = "http://localhost:8080/callback"
+	state       = "state-string"
+	scope       = "playlist-read-private playlist-modify-private"
+)
+
+var (
+	playlistsToShuffle = []string{"Playlist 1", "Playlist 2", "Playlist 3"}
+)
+
+func main() {
+	// Create a buffered channel to receive the authenticated client
+	ch := make(chan *spotify.Client, 1)
+
+	// Start an HTTP server to handle the Spotify authentication callback
+	http.HandleFunc("/callback", completeAuth(ch))
+	go http.ListenAndServe(":8080", nil)
+
+	// Authenticate and get the Spotify client
+	client := authenticate()
+	ch <- client
+
+	// Wait for the client to be received from the channel
+	client = <-ch
+
+	// Get ids for the playlists
+	playlistIDs, err := getPlaylistIDs(context.Background(), client, []string{"Playlist 1", "Playlist 2", "Playlist 3"})
+	if err != nil {
+		log.Fatalf("Failed to get playlist IDs: %v", err)
+	}
+
+	// Shuffle the playlists
+	for _, playlistID := range playlistIDs {
+		err := shufflePlaylist(client, playlistID)
+		if err != nil {
+			log.Printf("Failed to shuffle playlist with ID %s: %v", playlistID, err)
+		} else {
+			log.Printf("Successfully shuffled playlist with ID %s", playlistID)
+		}
+	}
+}
+
+func authenticate() *spotify.Client {
+	auth := spotify.NewAuthenticator(redirectURI, scope)
+	auth.SetAuthInfo(os.Getenv("SPOTIPY_CLIENT_ID"), os.Getenv("SPOTIPY_CLIENT_SECRET"))
+
+	// Use a random state string to protect against CSRF attacks
+	auth.SetState(state)
+
+	// Redirect user to Spotify login page
+	url := auth.AuthURL(state)
+	fmt.Println("Please log in to Spotify by visiting the following page in your browser:", url)
+
+	// Wait for user to complete authentication and receive token
+	token, err := auth.Token(state)
+	if err != nil {
+		log.Fatalf("Failed to get Spotify token: %v", err)
+	}
+
+	// Create and return Spotify client
+	return auth.NewClient(token)
+}
+
+func completeAuth(ch chan<- *spotify.Client) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// Parse query parameters from the callback URL
+		queryParams := r.URL.Query()
+		code := queryParams.Get("code")
+		state := queryParams.Get("state")
+
+		// Verify state string to protect against CSRF attacks
+		if state != state {
+			log.Fatal("State mismatch")
+		}
+
+		// Exchange code for token
+		auth := spotify.NewAuthenticator(redirectURI, scope)
+		token, err := auth.Token(code)
+		if err != nil {
+			log.Fatalf("Failed to get Spotify token: %v", err)
+		}
+
+		// Create and send Spotify client via channel
+		client := auth.NewClient(token)
+		ch <- client
+
+		// Send response to close the browser window
+		fmt.Fprint(w, "You can now close this window.")
+	}
+}
+
+func getPlaylistIDs(ctx context.Context, client *spotify.Client, user *spotify.PrivateUser, playlistsToShuffle []string) ([]spotify.ID, error) {
+	var playlistIDs []spotify.ID
+
+	// Get user's playlists
+	playlists, err := client.GetPlaylists(ctx, user.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Loop through user's playlists and find the ones to shuffle
+	for _, playlist := range playlists.Playlists {
+		for _, playlistName := range playlistsToShuffle {
+			if strings.Contains(playlist.Name, playlistName) {
+				playlistIDs = append(playlistIDs, playlist.ID)
+			}
+		}
+	}
+
+	return playlistIDs, nil
+}
+
+func shufflePlaylist(client *spotify.Client, playlistID spotify.ID) error {
+	// Get playlist tracks
+	tracks, err := client.GetPlaylistTracks(context.Background(), playlistID)
+	if err != nil {
+		return err
+	}
+
+	// Shuffle the tracks
+	rand.Shuffle(len(tracks.Tracks), func(i, j int) {
+		tracks.Tracks[i], tracks.Tracks[j] = tracks.Tracks[j], tracks.Tracks[i]
+	})
+
+	// Update the playlist with shuffled tracks
+	_, err = client.ReorderPlaylistTracks(context.Background(), playlistID, spotify.PlaylistReorderOptions{
+		RangeStart:     0,
+		RangeLength:    len(tracks.Tracks),
+		InsertBefore:   0,
+		SnapshotID:     "",
+		Tracks:         tracks.Tracks,
+	})
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
