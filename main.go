@@ -27,7 +27,6 @@ func main() {
 		TokenURL:     spotify.TokenURL,
 	}
 	client := config.Client(context.Background())
-	client.Header.Add("Content-Type", "application/json") // Add Content-Type header
 
 	// Set up Spotify Web API client
 	api := spotify.NewClient(client)
