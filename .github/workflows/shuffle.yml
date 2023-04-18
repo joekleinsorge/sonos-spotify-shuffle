@@ -1,9 +1,7 @@
 name: Shuffle Spotify Playlists
 
 on:
-  push:
-    branches:
-      - main
+  workflow_dispatch:
 
 jobs:
   shuffle_playlists:
