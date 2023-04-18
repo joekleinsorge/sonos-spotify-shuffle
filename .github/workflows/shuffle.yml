@@ -1,0 +1,25 @@
+name: Shuffle Spotify Playlists
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  shuffle_playlists:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+
+    - name: Set up Go
+      uses: actions/setup-go@v2
+
+    - name: Run shuffle
+      run: go run main.go
+      env:
+        SPOTIFY_CLIENT_ID: ${{ secrets.SPOTIFY_CLIENT_ID }}
+        SPOTIFY_CLIENT_SECRET: ${{ secrets.SPOTIFY_CLIENT_SECRET }}
+        SPOTIFY_USER_ID: ${{ secrets.SPOTIFY_USER_ID }}
+        SPOTIFY_PLAYLISTS: ${{ var.SPOTIFY_PLAYLISTS}}
