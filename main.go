@@ -83,7 +83,13 @@ func shufflePlaylist(api spotify.Client, playlistID spotify.ID) error {
 	})
 
 	// Update the playlist with shuffled tracks
-	_, err = api.ReorderPlaylistTracks(playlistID, 0, 0, tracks.Tracks)
+	playlistShuffleOptions := spotify.PlaylistReorderOptions{
+		RangeStart: 0,
+		RangeLength: len(tracks.Tracks),
+		InsertBefore: 0,
+	}
+
+	_, err = api.ReorderPlaylistTracks(playlistID, playlistShuffleOptions)
 	if err != nil {
 		return err
 	}
