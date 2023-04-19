@@ -4,7 +4,6 @@ go 1.19
 
 require (
 	github.com/zmb3/spotify v1.3.0
-	github.com/zmb3/spotify/v2 v2.3.1
 	golang.org/x/oauth2 v0.7.0
 )
 
