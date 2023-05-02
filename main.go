@@ -1,3 +1,7 @@
+// export SPOTIFY_ID='<your-spotify-client-id>'
+// export SPOTIFY_SECRET='<your-spotify-client-secret>'
+// export SPOTIFY_PLAYLISTS='<comma-separated-list-of-playlist-names-to-shuffle,no-spaces-between-commas>'
+
 package main
 
 import (
@@ -5,95 +9,129 @@ import (
 	"fmt"
 	"log"
 	"math/rand"
+	"net/http"
 	"os"
 	"strings"
-	"time"
 
-	"github.com/zmb3/spotify"
-	"golang.org/x/oauth2/clientcredentials"
+	"github.com/zmb3/spotify/v2"
+	spotifyauth "github.com/zmb3/spotify/v2/auth"
+)
+
+const redirectURI = "http://localhost:8080/callback"
+
+var (
+	auth  = spotifyauth.New(spotifyauth.WithRedirectURL(redirectURI), spotifyauth.WithScopes(spotifyauth.ScopePlaylistModifyPublic))
+	ch    = make(chan *spotify.Client)
+	state = "abc123"
 )
 
 func main() {
-	// Get GitHub repository secrets
-	clientID := os.Getenv("SPOTIFY_CLIENT_ID")
-	clientSecret := os.Getenv("SPOTIFY_CLIENT_SECRET")
-	userID := os.Getenv("SPOTIFY_USER_ID")
-	playlistsToShuffle := strings.Split(os.Getenv("SPOTIFY_PLAYLISTS"), ",")
+	// Authenticate with Spotify User
+	ctx := context.Background()
 
-	// Set up Spotify API client
-	config := &clientcredentials.Config{
-		ClientID:     clientID,
-		ClientSecret: clientSecret,
-		TokenURL:     spotify.TokenURL,
-	}
-	client := config.Client(context.Background())
+	// first start an HTTP server
+	http.HandleFunc("/callback", completeAuth)
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		log.Println("Got request for:", r.URL.String())
+	})
+	go func() {
+		err := http.ListenAndServe(":8080", nil)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}()
 
-	// Set up Spotify Web API client
-	api := spotify.NewClient(client)
+	url := auth.AuthURL(state)
+	fmt.Println("Please log in to Spotify by visiting the following page in your browser:", url)
 
-	// Get playlist IDs
-	playlistIDs, err := getPlaylistIDs(api, userID, playlistsToShuffle)
+	// wait for auth to complete
+	client := <-ch
+
+	// use the client to make calls that require authorization
+	user, err := client.CurrentUser(context.Background())
 	if err != nil {
 		log.Fatal(err)
 	}
+	fmt.Println("You are logged in as:", user.ID)
 
-	// Shuffle and update playlists
+	// Get list of playlists to shuffle from environment variable
+	playlistsToShuffle := strings.Split(os.Getenv("SPOTIFY_PLAYLISTS"), ",")
+	fmt.Println("Playlists to shuffle: ", playlistsToShuffle)
+
+	// Get the playlist IDs
+	playlistIDs := getPlaylistIDs(ctx, client, user, playlistsToShuffle)
+
+	// Shuffle the playlists
 	for _, playlistID := range playlistIDs {
-		err = shufflePlaylist(api, playlistID)
-		if err != nil {
-			log.Printf("Failed to shuffle playlist %s: %v", playlistID, err)
-		} else {
-			fmt.Printf("Playlist %s shuffled successfully\n", playlistID)
-		}
+		shufflePlaylist(client, playlistID)
 	}
+
+	fmt.Println("Done!")
 }
 
-func getPlaylistIDs(api spotify.Client, userID string, playlistsToShuffle []string) ([]spotify.ID, error) {
+func getPlaylistIDs(ctx context.Context, client *spotify.Client, user *spotify.PrivateUser, playlistsToShuffle []string) []spotify.ID {
 	var playlistIDs []spotify.ID
-
-	// Get user's playlists
-	playlists, err := api.GetPlaylistsForUser(userID)
+	playlists, err := client.GetPlaylistsForUser(ctx, user.ID)
 	if err != nil {
-		return nil, err
+		log.Fatalf("error retrieve user playlists: %v", err)
 	}
+	fmt.Println("Looking for matching playlists...")
 
-	// Loop through user's playlists and find the ones to shuffle
+	// Get the IDs of the playlists to shuffle
 	for _, playlist := range playlists.Playlists {
-		for _, playlistName := range playlistsToShuffle {
-			if strings.Contains(playlist.Name, playlistName) {
+		for _, playlistToShuffle := range playlistsToShuffle {
+			fmt.Println("  Checking:", strings.ToLower(playlistToShuffle))
+			fmt.Println("  Against:", strings.ToLower(playlist.Name))
+			if strings.EqualFold(playlist.Name, playlistToShuffle) {
+				fmt.Println(" Found:", playlist.Name, "-", playlist.ID)
 				playlistIDs = append(playlistIDs, playlist.ID)
 			}
 		}
 	}
-
-	return playlistIDs, nil
+	return playlistIDs
 }
 
-func shufflePlaylist(api spotify.Client, playlistID spotify.ID) error {
-	// Get playlist tracks
-	tracks, err := api.GetPlaylistTracks(playlistID)
+func shufflePlaylist(client *spotify.Client, playlistID spotify.ID) {
+	// Get the first 100 tracks in the playlist
+	tracks, err := client.GetPlaylistTracks(context.Background(), playlistID)
 	if err != nil {
-		return err
+		log.Fatalf("error retrieve playlist tracks: %v", err)
+	}
+
+	// Create a new slice of tracks ID to reorder
+	var newTracks []spotify.ID
+	for _, track := range tracks.Tracks {
+		newTracks = append(newTracks, track.Track.ID)
 	}
 
 	// Shuffle the tracks
-	rand.Seed(time.Now().UnixNano())
-	rand.Shuffle(len(tracks.Tracks), func(i, j int) {
-		tracks.Tracks[i], tracks.Tracks[j] = tracks.Tracks[j], tracks.Tracks[i]
-	})
-
-	// Update the playlist with shuffled tracks
-	playlistShuffleOptions := spotify.PlaylistReorderOptions{
-		RangeStart: 0,
-		RangeLength: len(tracks.Tracks),
-		InsertBefore: 0,
+	for i := range newTracks {
+		j := rand.Intn(i + 1)
+		newTracks[i], newTracks[j] = newTracks[j], newTracks[i]
 	}
 
-	_, err = api.ReorderPlaylistTracks(playlistID, playlistShuffleOptions)
+	// Replace the tracks in the playlist with the new order
+	err = client.ReplacePlaylistTracks(context.Background(), playlistID, newTracks...)
 	if err != nil {
-		return err
+		log.Fatalf("error replace playlist tracks: %v", err)
 	}
 
-	return nil
+	fmt.Println("Playlist ", playlistID, " shuffled!")
 }
 
+func completeAuth(w http.ResponseWriter, r *http.Request) {
+	tok, err := auth.Token(r.Context(), state, r)
+	if err != nil {
+		http.Error(w, "Couldn't get token", http.StatusForbidden)
+		log.Fatal(err)
+	}
+	if st := r.FormValue("state"); st != state {
+		http.NotFound(w, r)
+		log.Fatalf("State mismatch: %s != %s\n", st, state)
+	}
+
+	// use the token to get an authenticated client
+	client := spotify.New(auth.Client(r.Context(), tok))
+	fmt.Fprintf(w, "Login Completed!")
+	ch <- client
+}
